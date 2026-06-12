@@ -13,7 +13,7 @@ import (
 type Conn struct {
 	mu      sync.Mutex
 	session *Session
-	stream  quic.Stream
+	stream  *quic.Stream // pointer because quic.Stream is a concrete struct
 	closed  bool
 }
 

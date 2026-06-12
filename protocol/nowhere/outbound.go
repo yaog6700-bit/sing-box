@@ -5,6 +5,7 @@ package nowhere
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/outbound"
@@ -12,6 +13,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	nowhereTransport "github.com/sagernet/sing-box/transport/nowhere"
+	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -28,7 +30,6 @@ type Outbound struct {
 }
 
 type nowhereClient struct {
-	mu      context.Context
 	session *nowhereTransport.Session
 	cfg     *nowhereTransport.Config
 }
@@ -53,7 +54,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		TLSServerName: tlsServerName,
 	}
 
-	// Validate config early (checks key/spec/alpn lengths, derives spec)
+	// Validate config early
 	if _, err := nowhereTransport.BuildEffectiveSpec(cfg.Key, cfg.Spec, cfg.ALPN); err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func (o *Outbound) DialContext(ctx context.Context, network string, destination 
 		<-done
 		return conn, dialErr
 	default:
-		return nil, N.ErrNoRoute
+		return nil, E.New("unsupported network: ", network)
 	}
 }
 
@@ -122,7 +123,7 @@ func (o *Outbound) Close() error {
 	return nil
 }
 
-// ── nowhereClient ──────────────────────────────────────────────────────────
+// ── nowhereClient ─────────────────────────────────────────────────────────────
 
 func (c *nowhereClient) getSession() (*nowhereTransport.Session, error) {
 	if c.session != nil && !c.session.IsClosed() {
@@ -148,7 +149,7 @@ func (c *nowhereClient) close() {
 	}
 }
 
-// ── nowherePacketConn ──────────────────────────────────────────────────────
+// ── nowherePacketConn ─────────────────────────────────────────────────────────
 
 type nowherePacketConn struct {
 	conn *nowhereTransport.UDPConn
@@ -171,8 +172,8 @@ func (c *nowherePacketConn) WriteTo(p []byte, _ net.Addr) (n int, err error) {
 	return len(p), nil
 }
 
-func (c *nowherePacketConn) Close() error                       { return c.conn.Close() }
-func (c *nowherePacketConn) LocalAddr() net.Addr                { return &net.UDPAddr{} }
-func (c *nowherePacketConn) SetDeadline(_ interface{}) error    { return nil }
-func (c *nowherePacketConn) SetReadDeadline(_ interface{}) error  { return nil }
-func (c *nowherePacketConn) SetWriteDeadline(_ interface{}) error { return nil }
+func (c *nowherePacketConn) Close() error                      { return c.conn.Close() }
+func (c *nowherePacketConn) LocalAddr() net.Addr               { return &net.UDPAddr{} }
+func (c *nowherePacketConn) SetDeadline(t time.Time) error     { return nil }
+func (c *nowherePacketConn) SetReadDeadline(t time.Time) error { return nil }
+func (c *nowherePacketConn) SetWriteDeadline(t time.Time) error { return nil }

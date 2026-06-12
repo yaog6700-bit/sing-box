@@ -40,7 +40,7 @@ type Session struct {
 	state         sessionState
 	cfg           *Config
 	effectiveSpec *EffectiveSpec
-	conn          quic.Connection
+	conn          *quic.Conn
 
 	waiters    []chan error
 	tcpConns   map[quic.StreamID]*Conn
@@ -200,8 +200,9 @@ func (s *Session) readDatagrams() {
 	}
 }
 
-// OpenTCPStream opens a new QUIC bidirectional stream for TCP proxying.
-func (s *Session) OpenTCPStream() (quic.Stream, error) {
+// OpenTCPStream opens a new QUIC bidirectional stream.
+// OpenStream already returns *quic.Stream (pointer) in sagernet's fork.
+func (s *Session) OpenTCPStream() (*quic.Stream, error) {
 	s.mu.Lock()
 	if s.state != stateReady {
 		s.mu.Unlock()
@@ -209,10 +210,12 @@ func (s *Session) OpenTCPStream() (quic.Stream, error) {
 	}
 	conn := s.conn
 	s.mu.Unlock()
+
 	stream, err := conn.OpenStream()
 	if err != nil {
 		return nil, fmt.Errorf("nowhere: open stream: %w", err)
 	}
+
 	s.mu.Lock()
 	s.tcpConns[stream.StreamID()] = nil
 	s.mu.Unlock()
@@ -305,6 +308,7 @@ func (s *Session) Close() {
 	}
 }
 
+// IsClosed reports whether the session has been closed.
 func (s *Session) IsClosed() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
